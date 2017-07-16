@@ -28,7 +28,7 @@ public class Command {
 		this.name = name;
 		this.check = check;
 		this.call = call;
-		this.aliases = aliases;
+		this.aliases = new HashSet<>(aliases);
 		this.aliases.add(name);
 	}
 

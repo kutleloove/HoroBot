@@ -1,4 +1,4 @@
-package com.winter.horobot.permission;
+package com.winter.horobot.checks;
 
 import sx.blah.discord.handle.impl.events.guild.channel.message.MessageReceivedEvent;
 import sx.blah.discord.handle.obj.Permissions;

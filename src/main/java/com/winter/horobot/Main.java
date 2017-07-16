@@ -77,6 +77,7 @@ public class Main {
 		DEBUG("debug"),
 		TOKEN("token"),
 		DEBUG_TOKEN("debug-token"),
+		ERROR_CHANNEL("error-channel"),
 		DB_PASS("db-password"),
 		BOTS_PW_TOKEN("bots-pw-token"),
 		BOTS_ORG_TOKEN("bots-org-token"),

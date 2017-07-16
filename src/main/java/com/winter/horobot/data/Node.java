@@ -52,31 +52,28 @@ public class Node<T> {
 	}
 
 	public <U> Node<T> traverseThis(Function<Node<T>, U> converter, U toMatch, BiPredicate<U, U> equalityCheck) {
-		LOGGER.debug(String.format("`%s`", converter.apply(this).toString()));
+		for (Node<T> child : getChildren()) {
+			if (equalityCheck.test(converter.apply(child.traverseThis(converter, toMatch, equalityCheck)), toMatch)) {
+				return child;
+			}
+		}
 		if (equalityCheck.test(converter.apply(this), toMatch)) {
 			return this;
-		} else {
-			for (Node<T> child : getChildren()) {
-				if (equalityCheck.test(converter.apply(child.traverseThis(converter, toMatch, equalityCheck)), toMatch)) {
-					return child;
-				}
-			}
 		}
 		return null;
 	}
 
 	public <U> Node<T> traverseThis(Function<Node<T>, Set<U>> converter, U toMatch, BiPredicate<U, U> equalityCheck, boolean unused) {
 		for (U thing : converter.apply(this)) {
-			if (equalityCheck.test(thing, toMatch)) {
-				return this;
-			} else {
-				for (Node<T> child : getChildren()) {
-					for (U childThing : converter.apply(child)) {
-						if (equalityCheck.test(childThing, toMatch)) {
-							return child;
-						}
+			for (Node<T> child : getChildren()) {
+				for (U childThing : converter.apply(child)) {
+					if (equalityCheck.test(childThing, toMatch)) {
+						return child.traverseThis(converter, toMatch, equalityCheck, unused);
 					}
 				}
+			}
+			if (equalityCheck.test(thing, toMatch)) {
+				return this;
 			}
 		}
 		return null;
