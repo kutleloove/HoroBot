@@ -127,5 +127,11 @@
             <artifactId>animated-gif-lib-for-java</artifactId>
             <version>animated-gif-lib-1.2</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.github.TsundereBug</groupId>
+            <artifactId>IAmAshamedToMakeThis</artifactId>
+            <version>master-SNAPSHOT</version>
+        </dependency>
     </dependencies>
 </project>

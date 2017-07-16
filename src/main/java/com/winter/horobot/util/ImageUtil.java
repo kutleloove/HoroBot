@@ -3,8 +3,10 @@ package com.winter.horobot.util;
 import sx.blah.discord.handle.obj.IUser;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 
@@ -22,10 +24,12 @@ public class ImageUtil {
 		if (url == null)
 			return null;
 		URLConnection con = url.openConnection();
-		con.addRequestProperty("User-Agent", "Mozilla/5.0 HoroBot Discord Bot");
+		con.addRequestProperty("User-Agent", "Mozilla/5.0 HoroBot/2.0");
 		con.connect();
-		return ImageIO.read(con.getInputStream());
-		// TODO: I don't think this has to be closed, right? If it does then this might've been the source of the leak in default Horo
+		InputStream i = con.getInputStream();
+		BufferedImage b = ImageIO.read(i);
+		i.close(); // SMH WINTERY!!!
+		return b;
 	}
 
 	public static String getAvatar(IUser user) {
@@ -34,7 +38,20 @@ public class ImageUtil {
 
 	public static String getDefaultAvatar(IUser user) {
 		int discrim = Integer.parseInt(user.getDiscriminator());
-		discrim %= defaults.length;
-		return "https://discordapp.com/assets/" + defaults[discrim] + ".png";
+		return "https://discordapp.com/assets/" + defaults[discrim % defaults.length] + ".png";
 	}
+
+	public static int averageColor(BufferedImage i) {
+		int[] pxs = i.getRaster().getPixels(0, 0, i.getWidth(), i.getHeight(), (int[]) null);
+		int r = 0;
+		int g = 0;
+		int b = 0;
+		for(int j = 0; j < pxs.length; j += 3) {
+			r += pxs[j];
+			g += pxs[j + 1];
+			b += pxs[j + 2];
+		}
+		return new Color(r / (pxs.length / 3), g / (pxs.length / 3), b / (pxs.length / 3)).getRGB();
+	}
+
 }

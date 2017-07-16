@@ -1,8 +1,12 @@
 package com.winter.horobot.command;
 
+import com.tsunderebug.iaatmt.jsonapis.KonaChan;
+import com.winter.horobot.Main;
+import com.winter.horobot.checks.ChannelChecks;
 import com.winter.horobot.data.locale.Localisation;
 import com.winter.horobot.data.Node;
-import com.winter.horobot.permission.PermissionChecks;
+import com.winter.horobot.checks.PermissionChecks;
+import com.winter.horobot.exceptions.ErrorHandler;
 import com.winter.horobot.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,8 +18,10 @@ import sx.blah.discord.util.DiscordException;
 import sx.blah.discord.util.EmbedBuilder;
 
 import java.awt.*;
+import java.net.URI;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Commands implements IListener<MessageReceivedEvent> {
 
@@ -24,6 +30,7 @@ public class Commands implements IListener<MessageReceivedEvent> {
 	enum Category {
 		ADMIN("admin"),
 		FUN("fun"),
+		DEV("developer"),
 		STATUS("status");
 
 		private final String name;
@@ -42,13 +49,28 @@ public class Commands implements IListener<MessageReceivedEvent> {
 	public static final List<Node<Command>> COMMANDS = new ArrayList<>();
 
 	static {
+		COMMAND_MAP.put(Category.DEV, new ArrayList<>(Arrays.asList(
+				new Node<>(new Command(
+						"set",
+						PermissionChecks.isGlobal(),
+						e -> false
+				), Arrays.asList(
+						new Node<>(new Command(
+								"playing",
+								PermissionChecks.isGlobal(),
+								e -> {
+									Main.getClient().changePlayingText(MessageUtil.args(e.getMessage()).substring("set playing".length()));
+									return true;
+								}
+						), Collections.emptyList())
+				))
+		)));
 		COMMAND_MAP.put(Category.STATUS, new ArrayList<>(Arrays.asList(
-				new Node<>(
-						new Command(
-								"help",
-								PermissionChecks.hasPermision(Permissions.SEND_MESSAGES),
-								Commands::sendHelp
-						), Collections.emptyList()),
+				new Node<>(new Command(
+						"help",
+						PermissionChecks.hasPermision(Permissions.SEND_MESSAGES),
+						Commands::sendHelp
+				), Collections.emptyList()),
 				new Node<>(new Command(
 						"ping",
 						PermissionChecks.hasPermision(Permissions.SEND_MESSAGES),
@@ -78,7 +100,39 @@ public class Commands implements IListener<MessageReceivedEvent> {
 							e.getChannel().sendMessage(eb.build());
 							return true;
 						}
-				), Collections.emptyList())
+				), Collections.emptyList()),
+				new Node<>(new Command(
+						"kona",
+						PermissionChecks.hasPermision(Permissions.SEND_MESSAGES),
+						e -> {
+							String[] tags = Arrays.copyOfRange(MessageUtil.argsArray(e.getMessage()), 2, MessageUtil.argsArray(e.getMessage()).length);
+							KonaChan k = new KonaChan.Builder().withRating(KonaChan.KonaRating.SAFE).withTags(tags).build();
+							try {
+								URI u = k.randomURL();
+								MessageUtil.sendImageEmbed(e.getChannel(), e.getAuthor(), u);
+							} catch (IllegalArgumentException iae) {
+								MessageUtil.sendMessage(e.getChannel(), "no-images", MessageUtil.args(e.getMessage()));
+							}
+							return true;
+						}
+				), Arrays.asList(
+						new Node<>(new Command(
+								"nsfw",
+								PermissionChecks.hasPermision(Permissions.SEND_MESSAGES).and(ChannelChecks.isNSFW()),
+								e -> {
+									String[] tags = Arrays.copyOfRange(MessageUtil.argsArray(e.getMessage()), 2, MessageUtil.argsArray(e.getMessage()).length);
+									KonaChan k = new KonaChan.Builder().withRating(KonaChan.KonaRating.EXPLICIT).withTags(tags).build();
+									try {
+										URI u = k.randomURL();
+										MessageUtil.sendImageEmbed(e.getChannel(), e.getAuthor(), u);
+									} catch (IllegalArgumentException iae) {
+										MessageUtil.sendMessage(e.getChannel(), "no-images", MessageUtil.args(e.getMessage()));
+									}
+									return true;
+								},
+								Collections.singleton("explicit")
+						), Collections.emptyList())
+				))
 		)));
 		COMMAND_MAP.put(Category.ADMIN, new ArrayList<>(Arrays.asList(
 				new Node<>(new Command(
@@ -99,12 +153,12 @@ public class Commands implements IListener<MessageReceivedEvent> {
 	private static boolean sendHelp(MessageReceivedEvent e) {
 		try {
 			IChannel dmChannel = e.getAuthor().getOrCreatePMChannel();
-			for (Category c : COMMAND_MAP.keySet()) {
+			for (Map.Entry<Category, List<Node<Command>>> c : COMMAND_MAP.entrySet()) {
 				EmbedBuilder eb = new EmbedBuilder();
 				eb.withColor(Color.MAGENTA.darker());
-				eb.withTitle(Localisation.of(e.getGuild(), c.getName()) + " " + Localisation.of(e.getGuild(), "command"));
+				eb.withTitle(Localisation.of(e.getGuild(), c.getKey().getName()) + " " + Localisation.of(e.getGuild(), "command"));
 				StringBuilder desc = new StringBuilder();
-				for (Node<Command> n : COMMAND_MAP.get(c)) {
+				for (Node<Command> n : c.getValue()) {
 					desc.append("`").append(n.getData().getName()).append("`\n");
 				}
 				eb.appendDescription(desc.toString());
@@ -118,15 +172,27 @@ public class Commands implements IListener<MessageReceivedEvent> {
 
 	@Override
 	public void handle(MessageReceivedEvent e) {
-		if (e.getMessage().getContent().startsWith(GuildUtil.getPrefix(e.getGuild()))) {
-			String lookingFor = MessageUtil.args(e.getMessage());
-			LOGGER.debug(String.format("Looking for `%s` in the tree...", lookingFor));
-			COMMANDS.forEach(n -> {
-				Node<Command> gotten = n.traverseThis(node -> node.getData().getAliases(), lookingFor, (t, m) -> m.startsWith(t), false);
-				if (gotten != null) {
-					gotten.getData().call(e);
-				}
-			});
+		try {
+			if (e.getMessage().getContent().startsWith(GuildUtil.getPrefix(e.getGuild()))) {
+				String lookingFor = MessageUtil.args(e.getMessage());
+				COMMANDS.forEach(n -> {
+					Node<Command> gotten = n.traverseThis(node -> node.getData().getAliases().stream().map(s -> {
+						if (node.getParent() != null) {
+							return node.getParent().compileTopDown(Command::getName, (s1, s2) -> s1 + " " + s2) + " " + s;
+						} else {
+							return s;
+						}
+					}).collect(Collectors.toSet()), lookingFor, (t, m) -> m.startsWith(t + " ") || m.endsWith(t), false);
+					if (gotten != null) {
+						LOGGER.debug(String.format("Found `%s`", gotten.getData().getName()));
+						e.getChannel().setTypingStatus(true);
+						gotten.getData().call(e);
+						e.getChannel().setTypingStatus(false);
+					}
+				});
+			}
+		} catch (Exception ex) {
+			ErrorHandler.log(ex, "Guild: " + e.getGuild());
 		}
 	}
 }
