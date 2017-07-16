@@ -657,7 +657,10 @@ public class Utility {
 		URLConnection connection = urll.openConnection();
 		connection.addRequestProperty("User-Agent", "Mozilla/5.0 Apache the Attack Helicopter");
 		connection.connect();
-		return ImageIO.read(connection.getInputStream());
+		InputStream i = connection.getInputStream();
+		BufferedImage b = ImageIO.read(i);
+		i.close();
+		return b;
 	}
 
 	public static String listAsString(List<String> list) {

@@ -48,10 +48,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.awt.*;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -72,12 +69,16 @@ public class HTTPHandler {
 			HttpsURLConnection con = (HttpsURLConnection) url.openConnection();
 			con.setRequestProperty("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:10.0.2) Gecko/20100101 Firefox/10.0.2");
 			con.connect();
-			rd = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
+			InputStream i = con.getInputStream();
+			rd = new BufferedReader(new InputStreamReader(i, StandardCharsets.UTF_8));
+			i.close();
 		} else {
 			HttpURLConnection con = (HttpURLConnection) url.openConnection();
 			con.setRequestProperty("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:10.0.2) Gecko/20100101 Firefox/10.0.2");
 			con.connect();
-			rd = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
+			InputStream i = con.getInputStream();
+			rd = new BufferedReader(new InputStreamReader(i, StandardCharsets.UTF_8));
+			i.close();
 		}
 
 		String line;
