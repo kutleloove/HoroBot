@@ -1,6 +1,7 @@
 package com.winter.horobot.command;
 
 import com.tsunderebug.iaatmt.jsonapis.KonaChan;
+import com.winter.horobot.Main;
 import com.winter.horobot.checks.ChannelChecks;
 import com.winter.horobot.data.locale.Localisation;
 import com.winter.horobot.data.Node;
@@ -29,6 +30,7 @@ public class Commands implements IListener<MessageReceivedEvent> {
 	enum Category {
 		ADMIN("admin"),
 		FUN("fun"),
+		DEV("developer"),
 		STATUS("status");
 
 		private final String name;
@@ -47,6 +49,22 @@ public class Commands implements IListener<MessageReceivedEvent> {
 	public static final List<Node<Command>> COMMANDS = new ArrayList<>();
 
 	static {
+		COMMAND_MAP.put(Category.DEV, new ArrayList<>(Arrays.asList(
+				new Node<>(new Command(
+						"set",
+						PermissionChecks.isGlobal(),
+						e -> false
+				), Arrays.asList(
+						new Node<>(new Command(
+								"playing",
+								PermissionChecks.isGlobal(),
+								e -> {
+									Main.getClient().changePlayingText(MessageUtil.args(e.getMessage()).substring("set playing".length()));
+									return true;
+								}
+						), Collections.emptyList())
+				))
+		)));
 		COMMAND_MAP.put(Category.STATUS, new ArrayList<>(Arrays.asList(
 				new Node<>(new Command(
 						"help",
@@ -135,12 +153,12 @@ public class Commands implements IListener<MessageReceivedEvent> {
 	private static boolean sendHelp(MessageReceivedEvent e) {
 		try {
 			IChannel dmChannel = e.getAuthor().getOrCreatePMChannel();
-			for (Category c : COMMAND_MAP.keySet()) {
+			for (Map.Entry<Category, List<Node<Command>>> c : COMMAND_MAP.entrySet()) {
 				EmbedBuilder eb = new EmbedBuilder();
 				eb.withColor(Color.MAGENTA.darker());
-				eb.withTitle(Localisation.of(e.getGuild(), c.getName()) + " " + Localisation.of(e.getGuild(), "command"));
+				eb.withTitle(Localisation.of(e.getGuild(), c.getKey().getName()) + " " + Localisation.of(e.getGuild(), "command"));
 				StringBuilder desc = new StringBuilder();
-				for (Node<Command> n : COMMAND_MAP.get(c)) {
+				for (Node<Command> n : c.getValue()) {
 					desc.append("`").append(n.getData().getName()).append("`\n");
 				}
 				eb.appendDescription(desc.toString());
@@ -164,7 +182,7 @@ public class Commands implements IListener<MessageReceivedEvent> {
 						} else {
 							return s;
 						}
-					}).collect(Collectors.toSet()), lookingFor, (t, m) -> m.startsWith(t + " "), false);
+					}).collect(Collectors.toSet()), lookingFor, (t, m) -> m.startsWith(t + " ") || m.endsWith(t), false);
 					if (gotten != null) {
 						LOGGER.debug(String.format("Found `%s`", gotten.getData().getName()));
 						e.getChannel().setTypingStatus(true);

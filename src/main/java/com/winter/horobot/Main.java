@@ -79,6 +79,7 @@ public class Main {
 		DEBUG_TOKEN("debug-token"),
 		ERROR_CHANNEL("error-channel"),
 		DB_PASS("db-password"),
+		GLOBALS("globals"),
 		BOTS_PW_TOKEN("bots-pw-token"),
 		BOTS_ORG_TOKEN("bots-org-token"),
 		MAL_CREDENTIALS("mal-credentials"),
