@@ -19,7 +19,7 @@ public class ErrorHandler {
 		e.withColor(Color.red);
 		e.withTitle("An error has occured! " + meta);
 		e.appendDescription("```\n");
-		e.appendDescription(t.getMessage().replaceAll(" ", "\u00A0").trim()); // Nobreak Space
+		e.appendDescription(t.toString().replaceAll(" ", "\u00A0").trim()); // Nobreak Space
 		e.appendDescription("\n```");
 		c.sendMessage(e.build());
 	}

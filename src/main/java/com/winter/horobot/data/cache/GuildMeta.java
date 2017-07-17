@@ -1,19 +1,25 @@
 package com.winter.horobot.data.cache;
 
-import com.winter.horobot.Main;
 import com.winter.horobot.data.Database;
 import com.winter.horobot.exceptions.UpdateFailedException;
-import sx.blah.discord.api.internal.DiscordClientImpl;
-import sx.blah.discord.handle.impl.obj.Guild;
-import sx.blah.discord.handle.impl.obj.VoiceChannel;
-import sx.blah.discord.handle.obj.IGuild;
+import sx.blah.discord.api.IDiscordClient;
+import sx.blah.discord.api.IShard;
+import sx.blah.discord.handle.audio.IAudioManager;
+import sx.blah.discord.handle.obj.*;
+import sx.blah.discord.util.Ban;
+import sx.blah.discord.util.Image;
 
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-public class GuildMeta extends Guild {
+public class GuildMeta implements IGuild {
 
-	private volatile String prefix;
+	private final IGuild guild;
+	private volatile Set<String> prefixes; // why volatile?
 	private volatile String language;
 	private volatile String welcome;
 	private volatile String pm;
@@ -27,32 +33,41 @@ public class GuildMeta extends Guild {
 	 * @param guild The guild object to construct metadata for
 	 */
 	public GuildMeta(IGuild guild) {
-		super(guild.getShard(), guild.getName(), guild.getLongID(), guild.getIcon(), guild.getOwnerLongID(), Optional.ofNullable(guild.getAFKChannel()).orElse(
-				new VoiceChannel((DiscordClientImpl) Main.getClient(), "", 0L, guild, "", -1, -1, -1, null, null)
-		).getLongID(), guild.getAFKTimeout(), guild.getRegion().getID(), guild.getVerificationLevel().ordinal());
+		this.guild = guild;
 		Map<String, Object> settings = Database.get("SELECT * FROM guilds.guild WHERE id=?", guild.getStringID());
-		this.prefix = (String) settings.getOrDefault("prefix", ".horo");
+		this.prefixes = Arrays.stream(((String) settings.getOrDefault("prefixes", ".horo")).split(",")).collect(Collectors.toSet());
+		if(prefixes.isEmpty()) {
+			try {
+				addPrefix(".horo");
+			} catch (UpdateFailedException e) {
+				e.printStackTrace();
+			}
+		}
 		this.language = (String) settings.getOrDefault("language", "en");
 		this.welcome = (String) settings.getOrDefault("welcome", "none");
 		this.pm = (String) settings.getOrDefault("pm", "none");
-		// TODO vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 		String temp = (String) settings.getOrDefault("role", "none");
 		if (temp.equalsIgnoreCase("none")) this.autorole = 0L;
 		else this.autorole = Long.parseUnsignedLong(temp);
-		// TODO ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This is a no-go obviously but it is a temporary solution
 		this.levelupNotifications = (boolean) settings.getOrDefault("lvlup", true);
 		this.presentBan = (boolean) settings.getOrDefault("bpresentban", true);
 		this.botIgnore = (boolean) settings.getOrDefault("bignore", false);
 	}
 
-	public String getPrefix() {
-		return prefix;
+	public Set<String> getPrefixes() {
+		return prefixes;
 	}
 
-	public synchronized void setPrefix(String prefix) throws UpdateFailedException {
-		if (!Database.set("UPDATE guilds.guild SET prefix=? WHERE id=?", prefix, this.getStringID()))
+	public synchronized void addPrefix(String prefix) throws UpdateFailedException {
+		prefixes.add(prefix);
+		if (!Database.set("UPDATE guilds.guild SET prefix=? WHERE id=?", prefixes.stream().collect(Collectors.joining(",")), this.getStringID()))
 			throw new UpdateFailedException("Failed to update guild metadata");
-		this.prefix = prefix;
+	}
+
+	public synchronized void removePrefix(String prefix) throws UpdateFailedException {
+		prefixes.remove(prefix);
+		if (!Database.set("UPDATE guilds.guild SET prefix=? WHERE id=?", prefixes.stream().collect(Collectors.joining(",")), this.getStringID()))
+			throw new UpdateFailedException("Failed to update guild metadata");
 	}
 
 	public String getLanguage() {
@@ -123,5 +138,390 @@ public class GuildMeta extends Guild {
 		if (!Database.set("UPDATE guilds.guild SET bignore=? WHERE id=?", botIgnore, this.getStringID()))
 			throw new UpdateFailedException("Failed to update guild metadata");
 		this.botIgnore = botIgnore;
+	}
+
+	@Override
+	public long getOwnerLongID() {
+		return guild.getOwnerLongID();
+	}
+
+	@Override
+	public IUser getOwner() {
+		return guild.getOwner();
+	}
+
+	@Override
+	public String getIcon() {
+		return guild.getIcon();
+	}
+
+	@Override
+	public String getIconURL() {
+		return guild.getIconURL();
+	}
+
+	@Override
+	public List<IChannel> getChannels() {
+		return guild.getChannels();
+	}
+
+	@Override
+	public IChannel getChannelByID(long l) {
+		return guild.getChannelByID(l);
+	}
+
+	@Override
+	public List<IUser> getUsers() {
+		return guild.getUsers();
+	}
+
+	@Override
+	public IUser getUserByID(long l) {
+		return guild.getUserByID(l);
+	}
+
+	@Override
+	public List<IChannel> getChannelsByName(String s) {
+		return guild.getChannelsByName(s);
+	}
+
+	@Override
+	public List<IVoiceChannel> getVoiceChannelsByName(String s) {
+		return guild.getVoiceChannelsByName(s);
+	}
+
+	@Override
+	public List<IUser> getUsersByName(String s) {
+		return guild.getUsersByName(s);
+	}
+
+	@Override
+	public List<IUser> getUsersByName(String s, boolean b) {
+		return guild.getUsersByName(s, b);
+	}
+
+	@Override
+	public List<IUser> getUsersByRole(IRole iRole) {
+		return guild.getUsersByRole(iRole);
+	}
+
+	@Override
+	public String getName() {
+		return guild.getName();
+	}
+
+	@Override
+	public List<IRole> getRoles() {
+		return guild.getRoles();
+	}
+
+	@Override
+	public List<IRole> getRolesForUser(IUser iUser) {
+		return guild.getRolesForUser(iUser);
+	}
+
+	@Override
+	public IRole getRoleByID(long l) {
+		return guild.getRoleByID(l);
+	}
+
+	@Override
+	public List<IRole> getRolesByName(String s) {
+		return guild.getRolesByName(s);
+	}
+
+	@Override
+	public List<IVoiceChannel> getVoiceChannels() {
+		return guild.getVoiceChannels();
+	}
+
+	@Override
+	public IVoiceChannel getVoiceChannelByID(long l) {
+		return guild.getVoiceChannelByID(l);
+	}
+
+	@Override
+	public IVoiceChannel getConnectedVoiceChannel() {
+		return guild.getConnectedVoiceChannel();
+	}
+
+	@Override
+	public IVoiceChannel getAFKChannel() {
+		return guild.getAFKChannel();
+	}
+
+	@Override
+	public int getAFKTimeout() {
+		return guild.getAFKTimeout();
+	}
+
+	@Override
+	public IRole createRole() {
+		return guild.createRole();
+	}
+
+	@Override
+	public List<IUser> getBannedUsers() {
+		return guild.getBannedUsers();
+	}
+
+	@Override
+	public List<Ban> getBans() {
+		return guild.getBans();
+	}
+
+	@Override
+	public void banUser(IUser iUser) {
+		guild.banUser(iUser);
+	}
+
+	@Override
+	public void banUser(IUser iUser, int i) {
+		guild.banUser(iUser, i);
+	}
+
+	@Override
+	public void banUser(IUser iUser, String s) {
+		guild.banUser(iUser, s);
+	}
+
+	@Override
+	public void banUser(IUser iUser, String s, int i) {
+		guild.banUser(iUser, s, i);
+	}
+
+	@Override
+	public void banUser(long l) {
+		guild.banUser(l);
+	}
+
+	@Override
+	public void banUser(long l, int i) {
+		guild.banUser(l, i);
+	}
+
+	@Override
+	public void banUser(long l, String s) {
+		guild.banUser(l, s);
+	}
+
+	@Override
+	public void banUser(long l, String s, int i) {
+		guild.banUser(l, s, i);
+	}
+
+	@Override
+	public void pardonUser(long l) {
+		guild.pardonUser(l);
+	}
+
+	@Override
+	public void kickUser(IUser iUser) {
+		guild.kickUser(iUser);
+	}
+
+	@Override
+	public void kickUser(IUser iUser, String s) {
+		guild.kickUser(iUser, s);
+	}
+
+	@Override
+	public void editUserRoles(IUser iUser, IRole[] iRoles) {
+		guild.editUserRoles(iUser, iRoles);
+	}
+
+	@Override
+	public void setDeafenUser(IUser iUser, boolean b) {
+		guild.setDeafenUser(iUser, b);
+	}
+
+	@Override
+	public void setMuteUser(IUser iUser, boolean b) {
+		guild.setMuteUser(iUser, b);
+	}
+
+	@Override
+	public void setUserNickname(IUser iUser, String s) {
+		guild.setUserNickname(iUser, s);
+	}
+
+	@Override
+	public void edit(String s, IRegion iRegion, VerificationLevel verificationLevel, Image image, IVoiceChannel iVoiceChannel, int i) {
+		guild.edit(s, iRegion, verificationLevel, image, iVoiceChannel, i);
+	}
+
+	@Override
+	public void changeName(String s) {
+		guild.changeName(s);
+	}
+
+	@Override
+	public void changeRegion(IRegion iRegion) {
+		guild.changeRegion(iRegion);
+	}
+
+	@Override
+	public void changeVerificationLevel(VerificationLevel verificationLevel) {
+		guild.changeVerificationLevel(verificationLevel);
+	}
+
+	@Override
+	public void changeIcon(Image image) {
+		guild.changeIcon(image);
+	}
+
+	@Override
+	public void changeAFKChannel(IVoiceChannel iVoiceChannel) {
+		guild.changeAFKChannel(iVoiceChannel);
+	}
+
+	@Override
+	public void changeAFKTimeout(int i) {
+		guild.changeAFKTimeout(i);
+	}
+
+	@Override
+	public void deleteGuild() {
+		guild.deleteGuild();
+	}
+
+	@Override
+	public void leaveGuild() {
+		guild.leaveGuild();
+	}
+
+	@Override
+	public void leave() {
+		guild.leave();
+	}
+
+	@Override
+	public IChannel createChannel(String s) {
+		return guild.createChannel(s);
+	}
+
+	@Override
+	public IVoiceChannel createVoiceChannel(String s) {
+		return guild.createVoiceChannel(s);
+	}
+
+	@Override
+	public IRegion getRegion() {
+		return guild.getRegion();
+	}
+
+	@Override
+	public VerificationLevel getVerificationLevel() {
+		return guild.getVerificationLevel();
+	}
+
+	@Override
+	public IRole getEveryoneRole() {
+		return guild.getEveryoneRole();
+	}
+
+	@Override
+	public IChannel getGeneralChannel() {
+		return guild.getGeneralChannel();
+	}
+
+	@Override
+	public List<IInvite> getInvites() {
+		return guild.getInvites();
+	}
+
+	@Override
+	public List<IExtendedInvite> getExtendedInvites() {
+		return guild.getExtendedInvites();
+	}
+
+	@Override
+	public void reorderRoles(IRole... iRoles) {
+		guild.reorderRoles(iRoles);
+	}
+
+	@Override
+	public int getUsersToBePruned(int i) {
+		return guild.getUsersToBePruned(i);
+	}
+
+	@Override
+	public int pruneUsers(int i) {
+		return guild.pruneUsers(i);
+	}
+
+	@Override
+	public boolean isDeleted() {
+		return guild.isDeleted();
+	}
+
+	@Override
+	public IAudioManager getAudioManager() {
+		return guild.getAudioManager();
+	}
+
+	@Override
+	public LocalDateTime getJoinTimeForUser(IUser iUser) {
+		return guild.getJoinTimeForUser(iUser);
+	}
+
+	@Override
+	public IMessage getMessageByID(long l) {
+		return guild.getMessageByID(l);
+	}
+
+	@Override
+	public List<IEmoji> getEmojis() {
+		return guild.getEmojis();
+	}
+
+	@Override
+	public IEmoji getEmojiByID(long l) {
+		return guild.getEmojiByID(l);
+	}
+
+	@Override
+	public IEmoji getEmojiByName(String s) {
+		return guild.getEmojiByName(s);
+	}
+
+	@Override
+	public IWebhook getWebhookByID(long l) {
+		return guild.getWebhookByID(l);
+	}
+
+	@Override
+	public List<IWebhook> getWebhooksByName(String s) {
+		return guild.getWebhooksByName(s);
+	}
+
+	@Override
+	public List<IWebhook> getWebhooks() {
+		return guild.getWebhooks();
+	}
+
+	@Override
+	public int getTotalMemberCount() {
+		return 0;
+	}
+
+	@Override
+	public IDiscordClient getClient() {
+		return guild.getClient();
+	}
+
+	@Override
+	public IShard getShard() {
+		return guild.getShard();
+	}
+
+	@Override
+	public IGuild copy() {
+		return guild.copy();
+	}
+
+	@Override
+	public long getLongID() {
+		return guild.getLongID();
 	}
 }

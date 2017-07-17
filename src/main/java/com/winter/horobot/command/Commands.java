@@ -3,10 +3,12 @@ package com.winter.horobot.command;
 import com.tsunderebug.iaatmt.jsonapis.KonaChan;
 import com.winter.horobot.Main;
 import com.winter.horobot.checks.ChannelChecks;
+import com.winter.horobot.data.cache.HoroCache;
 import com.winter.horobot.data.locale.Localisation;
 import com.winter.horobot.data.Node;
 import com.winter.horobot.checks.PermissionChecks;
 import com.winter.horobot.exceptions.ErrorHandler;
+import com.winter.horobot.exceptions.UpdateFailedException;
 import com.winter.horobot.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,7 +146,42 @@ public class Commands implements IListener<MessageReceivedEvent> {
 						"ban",
 						PermissionChecks.hasPermision(Permissions.BAN),
 						AdminUtil::ban
-				), Collections.emptyList())
+				), Collections.emptyList()),
+				new Node<>(new Command(
+						"prefix",
+						PermissionChecks.hasPermision(Permissions.SEND_MESSAGES),
+						e -> {
+							MessageUtil.sendMessage(e.getChannel(), "prefixes", GuildUtil.getPrefixes(e.getGuild()).stream().collect(Collectors.joining(", ")));
+							return true;
+						}
+				), Arrays.asList(
+						new Node<>(new Command(
+								"add",
+								PermissionChecks.hasPermision(Permissions.MANAGE_SERVER),
+								e -> {
+									try {
+										HoroCache.get(e.getGuild()).addPrefix(MessageUtil.args(e.getMessage()).substring("prefix add ".length()));
+										MessageUtil.sendMessage(e.getChannel(), "added-prefix");
+									} catch (UpdateFailedException e1) {
+										ErrorHandler.log(e1, "Trying to add prefix for Guild " + e.getGuild().getName() + ": " + MessageUtil.args(e.getMessage()));
+									}
+									return true;
+								}
+						), Collections.emptyList()),
+						new Node<>(new Command(
+								"remove",
+								PermissionChecks.hasPermision(Permissions.MANAGE_SERVER),
+								e -> {
+									try {
+										HoroCache.get(e.getGuild()).removePrefix(MessageUtil.args(e.getMessage()).substring("prefix remove ".length()));
+										MessageUtil.sendMessage(e.getChannel(), "removed-prefix");
+									} catch (UpdateFailedException e1) {
+										ErrorHandler.log(e1, "Trying to remove prefix for Guild " + e.getGuild().getName() + ": " + MessageUtil.args(e.getMessage()));
+									}
+									return true;
+								}
+						), Collections.emptyList())
+				))
 		)));
 
 		COMMAND_MAP.values().forEach(COMMANDS::addAll);
@@ -173,7 +210,7 @@ public class Commands implements IListener<MessageReceivedEvent> {
 	@Override
 	public void handle(MessageReceivedEvent e) {
 		try {
-			if (e.getMessage().getContent().startsWith(GuildUtil.getPrefix(e.getGuild()))) {
+			if (GuildUtil.getPrefixes(e.getGuild()).stream().anyMatch(e.getMessage().getContent()::startsWith)) {
 				String lookingFor = MessageUtil.args(e.getMessage());
 				COMMANDS.forEach(n -> {
 					Node<Command> gotten = n.traverseThis(node -> node.getData().getAliases().stream().map(s -> {
@@ -192,7 +229,8 @@ public class Commands implements IListener<MessageReceivedEvent> {
 				});
 			}
 		} catch (Exception ex) {
-			ErrorHandler.log(ex, "Guild: " + e.getGuild());
+			ErrorHandler.log(ex, "Guild: " + e.getGuild().getName());
+			e.getChannel().setTypingStatus(false);
 		}
 	}
 }
