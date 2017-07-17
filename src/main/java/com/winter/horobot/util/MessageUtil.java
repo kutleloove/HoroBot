@@ -12,12 +12,14 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class MessageUtil {
 
 	public static String[] argsArray(IMessage m) {
-		return m.getContent().substring(GuildUtil.getPrefix(m.getGuild()).length()).split("\\s+");
+		Optional<String> o = GuildUtil.getPrefixes(m.getGuild()).stream().filter(m.getContent()::startsWith).findAny();
+		return o.map(s -> m.getContent().substring(s.length())).orElseGet(m::getContent).split("\\s+");
 	}
 
 	public static String args(IMessage m) {
@@ -39,6 +41,7 @@ public class MessageUtil {
 			EmbedBuilder b = new EmbedBuilder();
 			b.withAuthorIcon(ImageUtil.getAvatar(requested));
 			b.withAuthorName("Requested by " + requested.getDisplayName(channel.getGuild()));
+			b.withAuthorUrl(uri.toString());
 			try {
 				BufferedImage i = ImageUtil.imageFromURL(uri.toURL());
 				b.withColor(ImageUtil.averageColor(i));
